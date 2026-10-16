@@ -1,55 +1,41 @@
+from sqlalchemy.orm import Session
+
+from app.models.item import Item
+from app.repositories.item import ItemRepository
 from app.schemas.item import ItemCreate, ItemUpdate
 
-_items: dict[int, dict] = {}
-_next_id = 1
 
-
-def reset() -> None:
-    """Reseta o estado em memoria. Usado pelos testes para isolamento."""
-    global _next_id
-    _items.clear()
-    _next_id = 1
-
-
-def list_items(limit: int | None = None) -> list[dict]:
-    values = list(_items.values())
-    if limit is not None:
-        return values[:limit]
-    return values
-
-
-def get_item(item_id: int) -> dict:
-    if item_id not in _items:
+def _get_or_raise(repo: ItemRepository, item_id: int) -> Item:
+    item = repo.get(item_id)
+    if item is None:
         raise KeyError(item_id)
-    return _items[item_id]
-
-
-def create_item(data: ItemCreate) -> dict:
-    global _next_id
-    item = {"id": _next_id, "name": data.name, "description": data.description}
-    _items[_next_id] = item
-    _next_id += 1
     return item
 
 
-def replace_item(item_id: int, data: ItemCreate) -> dict:
-    if item_id not in _items:
-        raise KeyError(item_id)
-    item = {"id": item_id, "name": data.name, "description": data.description}
-    _items[item_id] = item
-    return item
+def list_items(db: Session, limit: int | None = None) -> list[Item]:
+    return ItemRepository(db).list(limit=limit)
 
 
-def update_item(item_id: int, data: ItemUpdate) -> dict:
-    if item_id not in _items:
-        raise KeyError(item_id)
-    current = _items[item_id]
-    changes = data.model_dump(exclude_unset=True)
-    current.update(changes)
-    return current
+def get_item(db: Session, item_id: int) -> Item:
+    return _get_or_raise(ItemRepository(db), item_id)
 
 
-def delete_item(item_id: int) -> None:
-    if item_id not in _items:
-        raise KeyError(item_id)
-    del _items[item_id]
+def create_item(db: Session, data: ItemCreate) -> Item:
+    return ItemRepository(db).create(Item(**data.model_dump()))
+
+
+def replace_item(db: Session, item_id: int, data: ItemCreate) -> Item:
+    repo = ItemRepository(db)
+    return repo.update(_get_or_raise(repo, item_id), data.model_dump())
+
+
+def update_item(db: Session, item_id: int, data: ItemUpdate) -> Item:
+    repo = ItemRepository(db)
+    return repo.update(
+        _get_or_raise(repo, item_id), data.model_dump(exclude_unset=True)
+    )
+
+
+def delete_item(db: Session, item_id: int) -> None:
+    repo = ItemRepository(db)
+    repo.delete(_get_or_raise(repo, item_id))

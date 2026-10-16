@@ -59,7 +59,9 @@ def test_put_item_inexistente_retorna_404():
 
 
 def test_patch_atualiza_parcialmente():
-    criado = client.post("/items/", json={"name": "Borracha", "description": "Branca"}).json()
+    criado = client.post(
+        "/items/", json={"name": "Borracha", "description": "Branca"}
+    ).json()
 
     response = client.patch(f"/items/{criado['id']}", json={"description": "Rosa"})
 
@@ -99,3 +101,16 @@ def test_list_items_com_query_param_limit():
 
     assert response.status_code == status.HTTP_200_OK
     assert len(response.json()) == 2
+
+
+def test_criar_consultar_e_listar_item_persistido():
+    criado = client.post("/items/", json={"name": "Notebook"})
+    assert criado.status_code == status.HTTP_201_CREATED
+
+    consultado = client.get(f"/items/{criado.json()['id']}")
+    assert consultado.status_code == status.HTTP_200_OK
+    assert consultado.json()["name"] == "Notebook"
+
+    lista = client.get("/items/")
+    assert lista.status_code == status.HTTP_200_OK
+    assert lista.json() != []

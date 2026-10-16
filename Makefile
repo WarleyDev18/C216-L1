@@ -1,4 +1,7 @@
-.PHONY: help install test lint format run up up-build down ps logs logs-api clean
+.PHONY: help install test lint format run up up-build down ps logs logs-api clean db-upgrade db-migration db-current
+
+# Para rodar o alembic na maquina (fora do Compose) o banco esta em localhost:5432.
+export DATABASE_URL ?= postgresql+psycopg://postgres:postgres@localhost:5432/app
 
 PYTHON  := poetry run python
 PYTEST  := poetry run pytest
@@ -19,6 +22,9 @@ help:
 	@echo "  make logs     - mostra logs de todos os servicos"
 	@echo "  make logs-api - mostra logs so da API"
 	@echo "  make clean    - para os containers e apaga o volume do banco"
+	@echo "  make db-upgrade   - aplica as migrations (alembic upgrade head)"
+	@echo "  make db-migration msg=\"...\" - gera migration autogenerate"
+	@echo "  make db-current   - mostra a revisao atual do banco"
 
 install:
 	cd backend && poetry install
@@ -56,3 +62,14 @@ logs-api:
 
 clean:
 	docker compose down -v
+
+# ---- Banco (Alembic) ----
+
+db-upgrade:
+	cd backend && poetry run alembic upgrade head
+
+db-migration:
+	cd backend && poetry run alembic revision --autogenerate -m "$(msg)"
+
+db-current:
+	cd backend && poetry run alembic current
