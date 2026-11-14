@@ -14,6 +14,9 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-interaction --no-ansi --only main
 
 COPY src/ ./src/
+# Migrations dentro da imagem: "make db-upgrade" e "make e2e" rodam o Alembic no container.
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 EXPOSE 8000
 

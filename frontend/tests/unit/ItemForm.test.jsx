@@ -37,4 +37,23 @@ describe("ItemForm", () => {
     );
     expect(onAdd).not.toHaveBeenCalled();
   });
+
+  it("mantém os campos e mostra a mensagem quando onAdd falha", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi
+      .fn()
+      .mockRejectedValue(new Error("Já existe um item com esse nome"));
+    render(<ItemForm onAdd={onAdd} />);
+
+    await user.type(screen.getByLabelText("Nome"), "Notebook");
+    await user.type(screen.getByLabelText("Descrição"), "16GB");
+    await user.click(screen.getByRole("button", { name: "Adicionar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Já existe um item com esse nome",
+    );
+    expect(screen.getByLabelText("Nome")).toHaveValue("Notebook");
+    expect(screen.getByLabelText("Descrição")).toHaveValue("16GB");
+    expect(screen.getByRole("button", { name: "Adicionar" })).toBeEnabled();
+  });
 });

@@ -15,6 +15,9 @@ class ItemRepository:
     def get(self, item_id: int) -> Item | None:
         return self.db.get(Item, item_id)
 
+    def get_by_name(self, name: str) -> Item | None:
+        return self.db.scalars(select(Item).where(Item.name == name)).first()
+
     def create(self, item: Item) -> Item:
         self.db.add(item)
         self.db.commit()

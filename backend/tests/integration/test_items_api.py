@@ -114,3 +114,32 @@ def test_criar_consultar_e_listar_item_persistido():
     lista = client.get("/items/")
     assert lista.status_code == status.HTTP_200_OK
     assert lista.json() != []
+
+
+def test_create_item_com_nome_duplicado_retorna_409():
+    client.post("/items/", json={"name": "Notebook"})
+
+    response = client.post("/items/", json={"name": "Notebook"})
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Já existe um item com esse nome"}
+    assert len(client.get("/items/").json()) == 1
+
+
+def test_patch_para_nome_de_outro_item_retorna_409():
+    client.post("/items/", json={"name": "Mouse"})
+    teclado = client.post("/items/", json={"name": "Teclado"}).json()
+
+    response = client.patch(f"/items/{teclado['id']}", json={"name": "Mouse"})
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+def test_put_mantendo_o_proprio_nome_nao_gera_conflito():
+    criado = client.post("/items/", json={"name": "Monitor"}).json()
+
+    response = client.put(
+        f"/items/{criado['id']}", json={"name": "Monitor", "description": "27"}
+    )
+
+    assert response.status_code == status.HTTP_200_OK

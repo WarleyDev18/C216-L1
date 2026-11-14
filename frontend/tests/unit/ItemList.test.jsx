@@ -23,4 +23,24 @@ describe("ItemList", () => {
       screen.queryByText("Nenhum item cadastrado."),
     ).not.toBeInTheDocument();
   });
+
+  it("mostra o carregamento no lugar da lista", () => {
+    render(<ItemList items={[]} loading />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Carregando itens...");
+    expect(
+      screen.queryByText("Nenhum item cadastrado."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("mostra o erro de carregamento como alerta", () => {
+    render(<ItemList items={[]} error="Não foi possível conectar à API." />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Não foi possível conectar à API.",
+    );
+    expect(
+      screen.queryByText("Nenhum item cadastrado."),
+    ).not.toBeInTheDocument();
+  });
 });

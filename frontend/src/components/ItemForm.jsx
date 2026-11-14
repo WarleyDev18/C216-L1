@@ -8,16 +8,27 @@ export function ItemForm({ onAdd }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const result = validateItem({ name, description });
     setErrors(result.errors);
+    setSubmitError("");
     if (Object.keys(result.errors).length > 0) return;
 
-    onAdd(result.values);
-    setName("");
-    setDescription("");
+    setSubmitting(true);
+    try {
+      await onAdd(result.values);
+      // So limpa quando a API confirmou; em erro o usuario nao perde o que digitou.
+      setName("");
+      setDescription("");
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -60,11 +71,21 @@ export function ItemForm({ onAdd }) {
         />
       </div>
 
+      {submitError && (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {submitError}
+        </p>
+      )}
+
       <button
         type="submit"
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-auto"
+        disabled={submitting}
+        className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        Adicionar
+        {submitting ? "Salvando..." : "Adicionar"}
       </button>
     </form>
   );
