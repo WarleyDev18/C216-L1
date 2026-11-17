@@ -5,8 +5,7 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from app.database.base import Base
-
-# Os modelos de dominio serao importados aqui para registrar suas tabelas no Base.metadata.
+from app.models import disciplina  # noqa: F401  (registra os modelos no Base.metadata)
 
 config = context.config
 
