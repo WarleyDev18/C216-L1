@@ -122,6 +122,18 @@ export function criarApiFalsa({
 
   const fetch = vi.fn(async (url, { method = "GET", body } = {}) => {
     const { pathname, searchParams } = new URL(url, "http://teste");
+    if (pathname === "/api/dashboard/resumo" && method === "GET") {
+      // Mesmos campos de ResumoDashboard, calculados sobre os dados em memoria.
+      const comStatus = (s) => tarefas.filter((a) => a.status === s).length;
+      return responder(200, {
+        total_disciplinas: registros.length,
+        total_atividades: tarefas.length,
+        pendentes: comStatus("pendente"),
+        em_andamento: comStatus("em_andamento"),
+        concluidas: comStatus("concluida"),
+        atrasadas: tarefas.filter(atrasada).length,
+      });
+    }
     const rota = pathname.match(/^\/api\/(disciplinas|atividades)\/(\d+)?$/);
     if (!rota) return responder(404, { detail: "Not Found" });
     const id = rota[2] ? Number(rota[2]) : null;
