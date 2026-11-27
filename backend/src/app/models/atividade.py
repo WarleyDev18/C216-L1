@@ -3,6 +3,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -39,7 +40,9 @@ class Atividade(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     disciplina_id: Mapped[int] = mapped_column(
-        ForeignKey("disciplinas.id", ondelete="CASCADE"), index=True
+        # RESTRICT: o banco recusa excluir disciplina que ainda tem atividades.
+        ForeignKey("disciplinas.id", ondelete="RESTRICT"),
+        index=True,
     )
     titulo: Mapped[str] = mapped_column(String(200))
     descricao: Mapped[str | None] = mapped_column(Text, default=None)
@@ -58,3 +61,9 @@ class Atividade(Base):
     )
 
     disciplina: Mapped["Disciplina"] = relationship(back_populates="atividades")
+
+    # Calculado, nunca gravado: vale em Python (objeto) e em SQL (filtros e contagens).
+    # Entrega hoje ainda esta no prazo; concluida nunca esta atrasada.
+    @hybrid_method
+    def atrasada_em(self, hoje: date):
+        return (self.data_entrega < hoje) & (self.status != Status.CONCLUIDA)

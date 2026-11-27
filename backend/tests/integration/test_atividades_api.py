@@ -2,6 +2,7 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
+from app.core.datas import hoje as data_de_hoje
 from app.main import app
 
 client = TestClient(app)
@@ -143,16 +144,36 @@ def test_move_atividade_para_outra_disciplina(valida):
     assert response.json()["disciplina_id"] == outra["id"]
 
 
-def test_excluir_disciplina_remove_suas_atividades(valida):
+def test_excluir_disciplina_com_atividades_retorna_409_e_preserva_tudo(valida):
+    criada = criar(valida).json()
+
+    response = client.delete(f"/disciplinas/{valida['disciplina_id']}")
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {
+        "detail": "Não é possível excluir a disciplina: existem atividades vinculadas a ela"
+    }
+    assert client.get(f"/disciplinas/{valida['disciplina_id']}").status_code == 200
+    assert client.get(f"{URL}{criada['id']}").json() == criada
+
+
+def test_excluir_disciplina_sem_atividades_retorna_204(valida):
     outra = client.post("/disciplinas/", json={**DISCIPLINA, "codigo": "C215"}).json()
-    da_excluida = criar(valida).json()
-    da_outra = criar(valida, disciplina_id=outra["id"]).json()
+    criar(valida)
+
+    response = client.delete(f"/disciplinas/{outra['id']}")
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert client.get(f"/disciplinas/{outra['id']}").status_code == 404
+
+
+def test_disciplina_pode_ser_excluida_depois_de_remover_suas_atividades(valida):
+    criada = criar(valida).json()
+    client.delete(f"{URL}{criada['id']}")
 
     response = client.delete(f"/disciplinas/{valida['disciplina_id']}")
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
-    assert client.get(f"{URL}{da_excluida['id']}").status_code == 404
-    assert [a["id"] for a in client.get(URL).json()] == [da_outra["id"]]
 
 
 # ---- Consulta ----
@@ -244,3 +265,107 @@ def test_exclui_inexistente_retorna_404():
     response = client.delete(f"{URL}999")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# ---- Filtros (hoje fixo em 2026-06-15 pelo conftest) ----
+
+
+@pytest.fixture
+def cenario(valida):
+    """Duas disciplinas e quatro atividades cobrindo cada filtro; devolve titulo -> id."""
+    outra = client.post("/disciplinas/", json={**DISCIPLINA, "codigo": "C215"}).json()
+    linhas = [
+        # titulo, disciplina, prioridade, status, entrega
+        ("vencida", valida["disciplina_id"], "alta", "pendente", "2026-06-14"),
+        (
+            "vencida-concluida",
+            valida["disciplina_id"],
+            "alta",
+            "concluida",
+            "2026-06-01",
+        ),
+        ("hoje", outra["id"], "baixa", "em_andamento", "2026-06-15"),
+        ("futura", outra["id"], "alta", "em_andamento", "2026-07-01"),
+    ]
+    return {
+        titulo: criar(
+            valida,
+            titulo=titulo,
+            disciplina_id=disc,
+            prioridade=prio,
+            status=st,
+            data_entrega=entrega,
+        ).json()["id"]
+        for titulo, disc, prio, st, entrega in linhas
+    } | {"_outra": outra["id"]}
+
+
+def titulos(**params):
+    response = client.get(URL, params=params)
+    assert response.status_code == status.HTTP_200_OK
+    return [a["titulo"] for a in response.json()]
+
+
+def test_sem_filtros_lista_tudo(cenario):
+    assert titulos() == ["vencida", "vencida-concluida", "hoje", "futura"]
+
+
+def test_filtra_por_disciplina(cenario):
+    assert titulos(disciplina_id=cenario["_outra"]) == ["hoje", "futura"]
+
+
+def test_filtra_por_prioridade(cenario):
+    assert titulos(prioridade="alta") == ["vencida", "vencida-concluida", "futura"]
+
+
+def test_filtra_por_status(cenario):
+    assert titulos(status="em_andamento") == ["hoje", "futura"]
+
+
+def test_filtra_atrasadas(cenario):
+    # Vencida e concluida nao conta; entrega hoje ainda esta no prazo.
+    assert titulos(atrasadas="true") == ["vencida"]
+
+
+def test_filtra_nao_atrasadas(cenario):
+    assert titulos(atrasadas="false") == ["vencida-concluida", "hoje", "futura"]
+
+
+def test_combina_filtros(cenario):
+    assert titulos(disciplina_id=cenario["_outra"], prioridade="alta") == ["futura"]
+    assert titulos(prioridade="alta", status="pendente", atrasadas="true") == [
+        "vencida"
+    ]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"status": "concluida", "atrasadas": "true"},
+        {"disciplina_id": 999},
+        {"prioridade": "baixa", "status": "pendente"},
+    ],
+)
+def test_filtro_sem_resultados_retorna_lista_vazia(cenario, params):
+    assert titulos(**params) == []
+
+
+def test_atrasadas_acompanha_a_data_de_hoje(cenario, hoje):
+    app.dependency_overrides[data_de_hoje] = lambda: hoje.replace(day=16)
+
+    assert titulos(atrasadas="true") == ["vencida", "hoje"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"prioridade": "urgente"},
+        {"status": "atrasada"},
+        {"atrasadas": "talvez"},
+        {"disciplina_id": "abc"},
+    ],
+)
+def test_filtro_invalido_retorna_422(params):
+    response = client.get(URL, params=params)
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

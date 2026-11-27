@@ -1,9 +1,12 @@
+from datetime import date
+
 import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401  (registra os modelos no Base.metadata)
+from app.core.datas import hoje as data_de_hoje
 from app.database.base import Base
 from app.database.session import get_db
 from app.main import app
@@ -36,3 +39,11 @@ def db():
         yield session
     app.dependency_overrides.clear()
     Base.metadata.drop_all(engine)
+
+
+@pytest.fixture(autouse=True)
+def hoje(db):
+    """Data fixa para "hoje": nenhum teste depende do dia em que roda."""
+    dia = date(2026, 6, 15)
+    app.dependency_overrides[data_de_hoje] = lambda: dia
+    return dia

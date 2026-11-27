@@ -1,7 +1,9 @@
+from datetime import date
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.atividade import Atividade
+from app.models.atividade import Atividade, Prioridade, Status
 from app.repositories.atividade import AtividadeRepository
 from app.repositories.disciplina import DisciplinaRepository
 from app.schemas.atividade import AtividadeCreate
@@ -27,8 +29,22 @@ def _ensure_disciplina_existe(db: Session, disciplina_id: int) -> None:
         raise DisciplinaInexistenteError(disciplina_id)
 
 
-def list_atividades(db: Session) -> list[Atividade]:
-    return AtividadeRepository(db).list()
+def list_atividades(
+    db: Session,
+    hoje: date,
+    *,
+    disciplina_id: int | None = None,
+    prioridade: Prioridade | None = None,
+    status: Status | None = None,
+    atrasadas: bool | None = None,
+) -> list[Atividade]:
+    return AtividadeRepository(db).list(
+        disciplina_id=disciplina_id,
+        prioridade=prioridade,
+        status=status,
+        atrasadas=atrasadas,
+        hoje=hoje,
+    )
 
 
 def get_atividade(db: Session, atividade_id: int) -> Atividade:

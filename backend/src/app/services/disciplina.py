@@ -2,6 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.disciplina import Disciplina
+from app.repositories.atividade import AtividadeRepository
 from app.repositories.disciplina import DisciplinaRepository
 from app.schemas.disciplina import DisciplinaCreate
 
@@ -12,6 +13,10 @@ class DisciplinaNaoEncontradaError(Exception):
 
 class DisciplinaDuplicadaError(Exception):
     """Ja existe disciplina com o mesmo codigo no mesmo semestre."""
+
+
+class DisciplinaComAtividadesError(Exception):
+    """A disciplina ainda tem atividades vinculadas e nao pode ser excluida."""
 
 
 def _get_or_raise(repo: DisciplinaRepository, disciplina_id: int) -> Disciplina:
@@ -49,6 +54,14 @@ def update_disciplina(
         raise DisciplinaDuplicadaError from exc
 
 
+# Mesmo padrao do cadastro de atividade: a checagem da a mensagem clara e a FK
+# RESTRICT cobre uma atividade criada entre a checagem e o commit.
 def delete_disciplina(db: Session, disciplina_id: int) -> None:
     repo = DisciplinaRepository(db)
-    repo.delete(_get_or_raise(repo, disciplina_id))
+    disciplina = _get_or_raise(repo, disciplina_id)
+    if AtividadeRepository(db).exists_for_disciplina(disciplina_id):
+        raise DisciplinaComAtividadesError(disciplina_id)
+    try:
+        repo.delete(disciplina)
+    except IntegrityError as exc:
+        raise DisciplinaComAtividadesError(disciplina_id) from exc

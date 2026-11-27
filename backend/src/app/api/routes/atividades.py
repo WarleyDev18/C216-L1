@@ -1,9 +1,12 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.datas import hoje as data_de_hoje
 from app.database.session import get_db
+from app.models.atividade import Prioridade, Status
 from app.schemas.atividade import Atividade, AtividadeCreate
 from app.services import atividade as atividade_service
 from app.services.atividade import (
@@ -13,6 +16,7 @@ from app.services.atividade import (
 
 router = APIRouter(prefix="/atividades", tags=["Atividades"])
 DbSession = Annotated[Session, Depends(get_db)]
+Hoje = Annotated[date, Depends(data_de_hoje)]
 
 NAO_ENCONTRADA = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND, detail="Atividade não encontrada"
@@ -25,8 +29,22 @@ DISCIPLINA_INEXISTENTE = HTTPException(
 
 
 @router.get("/", response_model=list[Atividade])
-def list_atividades(db: DbSession):
-    return atividade_service.list_atividades(db)
+def list_atividades(
+    db: DbSession,
+    hoje: Hoje,
+    disciplina_id: int | None = None,
+    prioridade: Prioridade | None = None,
+    status: Status | None = None,
+    atrasadas: bool | None = None,
+):
+    return atividade_service.list_atividades(
+        db,
+        hoje,
+        disciplina_id=disciplina_id,
+        prioridade=prioridade,
+        status=status,
+        atrasadas=atrasadas,
+    )
 
 
 @router.get("/{atividade_id}", response_model=Atividade)

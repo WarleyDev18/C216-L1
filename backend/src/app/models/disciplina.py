@@ -24,7 +24,8 @@ class Disciplina(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    # passive_deletes: quem apaga as atividades e o ON DELETE CASCADE do banco.
+    # passive_deletes="all": o ORM nao apaga nem anula as atividades ao excluir a
+    # disciplina; quem decide e a FK RESTRICT do banco.
     atividades: Mapped[list["Atividade"]] = relationship(
-        back_populates="disciplina", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="disciplina", passive_deletes="all"
     )

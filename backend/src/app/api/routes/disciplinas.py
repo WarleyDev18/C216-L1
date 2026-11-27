@@ -7,6 +7,7 @@ from app.database.session import get_db
 from app.schemas.disciplina import Disciplina, DisciplinaCreate
 from app.services import disciplina as disciplina_service
 from app.services.disciplina import (
+    DisciplinaComAtividadesError,
     DisciplinaDuplicadaError,
     DisciplinaNaoEncontradaError,
 )
@@ -20,6 +21,10 @@ NAO_ENCONTRADA = HTTPException(
 DUPLICADA = HTTPException(
     status_code=status.HTTP_409_CONFLICT,
     detail="Já existe uma disciplina com esse código nesse semestre",
+)
+COM_ATIVIDADES = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="Não é possível excluir a disciplina: existem atividades vinculadas a ela",
 )
 
 
@@ -60,3 +65,5 @@ def delete_disciplina(disciplina_id: int, db: DbSession):
         disciplina_service.delete_disciplina(db, disciplina_id)
     except DisciplinaNaoEncontradaError:
         raise NAO_ENCONTRADA
+    except DisciplinaComAtividadesError:
+        raise COM_ATIVIDADES

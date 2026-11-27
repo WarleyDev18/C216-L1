@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,9 @@ class DisciplinaRepository:
 
     def list(self) -> list[Disciplina]:
         return list(self.db.scalars(select(Disciplina).order_by(Disciplina.id)))
+
+    def count(self) -> int:
+        return self.db.scalar(select(func.count()).select_from(Disciplina))
 
     def get(self, disciplina_id: int) -> Disciplina | None:
         return self.db.get(Disciplina, disciplina_id)
