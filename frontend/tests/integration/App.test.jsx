@@ -22,10 +22,9 @@ describe("App", () => {
     await screen.findByText(/Nenhuma disciplina cadastrada/);
   });
 
-  it("abre em Disciplinas e navega para as secoes futuras sem simular dados", async () => {
+  it("abre em Disciplinas e navega entre as secoes", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const nav = screen.getByRole("navigation", { name: "Navegação principal" });
     await screen.findByText(/Nenhuma disciplina cadastrada/);
 
     expect(screen.getByRole("button", { name: "Disciplinas" })).toHaveAttribute(
@@ -37,17 +36,38 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Atividades" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Em desenvolvimento")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nenhuma atividade cadastrada ainda."),
+    ).toBeInTheDocument();
 
+    // Dashboard ainda nao existe: aparece como em desenvolvimento, sem dados falsos.
     await user.click(screen.getByRole("button", { name: "Dashboard" }));
     expect(
       screen.getByRole("heading", { level: 2, name: "Dashboard" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Em desenvolvimento")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Disciplinas" }));
     expect(
       await screen.findByRole("heading", { level: 2, name: "Disciplinas" }),
     ).toBeInTheDocument();
-    expect(nav).toBeInTheDocument();
+  });
+
+  it("leva de Atividades para Disciplinas quando nao ha disciplinas", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Atividades" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Ir para Disciplinas" }),
+    );
+
+    expect(screen.getByRole("button", { name: "Disciplinas" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Nova disciplina" }),
+    ).toBeInTheDocument();
   });
 });
