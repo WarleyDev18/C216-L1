@@ -1,0 +1,68 @@
+# Nome proprio: sem ele o Compose usaria o nome da pasta ("c216-l1") e
+# reaproveitaria os containers e o volume de banco das praticas anteriores.
+name: gestor-academico
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      # Dentro da rede do Compose o banco e alcancado pelo nome do servico "db".
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-gestor_academico}
+      # Origens do navegador (porta publicada do frontend), nao o nome do servico.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173}}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # /health consulta o banco: "saudavel" = API no ar e conectada ao PostgreSQL.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gestor_academico}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    # Sem "ports": o banco so e acessivel pela rede interna (use "make db-shell").
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      # O navegador chama /api na propria origem do frontend; o Vite repassa
+      # para a API pela rede do Compose. Assim o navegador nunca precisa
+      # resolver o nome "api", e nao ha requisicao entre origens (CORS).
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      API_PROXY_TARGET: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

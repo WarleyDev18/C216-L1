@@ -1,0 +1,66 @@
+name: CI - E2E
+
+# O E2E exercita a aplicacao inteira: qualquer mudanca em frontend, backend,
+# Compose, Makefile ou nas variaveis de exemplo pode quebra-lo.
+on:
+  push:
+    branches: [main, projeto-final]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "compose.yaml"
+      - "Makefile"
+      - ".env.example"
+      - ".github/workflows/ci-e2e.yml"
+  # Sem filtro de paths: o PR final para a main sempre roda o E2E.
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (full-stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright Browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Constroi e sobe db + api + frontend (projeto Compose isolado, credenciais
+      # ficticias do .env.example), espera os healthchecks, aplica as migracoes,
+      # roda o Playwright no Chromium e derruba a stack. Em falha, imprime os logs.
+      - name: Run Full-stack E2E (make e2e)
+        run: make e2e
+
+      - name: Upload Playwright Report and Traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
