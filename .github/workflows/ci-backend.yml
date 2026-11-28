@@ -2,16 +2,29 @@ name: CI - Backend
 
 on:
   push:
+    branches: [main, projeto-final]
     paths:
       - "backend/**"
       - ".github/workflows/ci-backend.yml"
-  # Sem filtro de paths: "Pytest" e check obrigatorio no ruleset e precisa rodar em todo PR.
+  # Sem filtro de paths: "Pytest" e check obrigatorio no ruleset da main e
+  # precisa rodar em todo PR para ela (inclusive o PR final projeto-final -> main).
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   tests:
+    # Nome do check exigido pelo ruleset da main: nao renomear.
     name: Pytest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -19,13 +32,14 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
+      # Mesma versao do backend/Dockerfile (o poetry.lock foi gerado com ela).
       - name: Install Poetry
-        run: pipx install poetry
+        run: pipx install poetry==2.4.1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: "poetry"
@@ -40,5 +54,6 @@ jobs:
       - name: Lint Code
         run: poetry run ruff check .
 
+      # SQLite em memoria por teste (tests/conftest.py): nao precisa de servico de banco.
       - name: Run Tests
         run: poetry run pytest

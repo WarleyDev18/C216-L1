@@ -1,5 +1,5 @@
 .PHONY: help install test lint format run db-migration \
-	up up-build down ps logs logs-api db-upgrade db-current db-shell \
+	up up-build down ps logs logs-api db-upgrade db-current db-shell e2e \
 	frontend-install frontend-dev frontend-lint frontend-format frontend-check \
 	frontend-test frontend-build check-all
 
@@ -34,6 +34,7 @@ help:
 	@echo "  make frontend-check    - lint + formatacao sem alterar"
 	@echo "  make frontend-test     - Vitest"
 	@echo "  make frontend-build    - build de producao"
+	@echo "  make e2e               - Playwright full-stack em stack isolada (portas 8001/5174)"
 	@echo "  make check-all         - Ruff + Pytest + Biome + Vitest + build"
 
 # ---- Backend ----
@@ -111,3 +112,23 @@ frontend-build:
 
 check-all: lint test frontend-check frontend-test frontend-build
 	cd backend && $(RUFF) format --check .
+
+# ---- E2E full-stack isolado (Playwright) ----
+# Projeto Compose proprio e portas proprias: nao encosta na stack de
+# desenvolvimento nem em outras stacks da maquina. --env-file .env.example:
+# valores ficticios versionados, sem depender do .env pessoal. Os testes so
+# apagam o que criam; "down" (sem -v) mantem o volume isolado do E2E.
+E2E_PORTA_API      := 8001
+E2E_PORTA_FRONTEND := 5174
+E2E_BASE_URL       := http://localhost:$(E2E_PORTA_FRONTEND)
+E2E_COMPOSE := API_PORT=$(E2E_PORTA_API) FRONTEND_PORT=$(E2E_PORTA_FRONTEND) \
+	docker compose -p gestor-academico-e2e --env-file .env.example
+
+e2e:
+	$(E2E_COMPOSE) up -d --build --wait --wait-timeout 300 && \
+	$(E2E_COMPOSE) exec -T api alembic upgrade head && \
+	E2E_BASE_URL=$(E2E_BASE_URL) $(NPM_FRONT) run test:e2e; \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then $(E2E_COMPOSE) logs --no-color --tail=200; fi; \
+	$(E2E_COMPOSE) down; \
+	exit $$status

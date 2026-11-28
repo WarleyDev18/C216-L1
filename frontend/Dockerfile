@@ -3,7 +3,10 @@ FROM node:22-slim
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# O npm pula em silencio dependencias opcionais que falham no download (como o
+# binario nativo do Rolldown, usado pelo Vite); importar o Rolldown aqui faz o
+# build falhar na hora, em vez de gerar uma imagem que quebra ao subir.
+RUN npm ci && node --input-type=module -e "await import('rolldown')"
 
 COPY . .
 
