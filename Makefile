@@ -1,8 +1,9 @@
 .PHONY: help install test lint format run db-migration \
+	up up-build down ps logs logs-api db-upgrade db-current db-shell \
 	frontend-install frontend-dev frontend-lint frontend-format frontend-check \
 	frontend-test frontend-build check-all
 
-# Banco local (fora do Compose); o Docker Compose sera integrado na etapa 08.
+# Banco local para "make run" e "make db-migration" (fora do Compose).
 export DATABASE_URL ?= postgresql+psycopg://postgres:postgres@localhost:5432/app
 
 PYTEST  := poetry run pytest
@@ -18,6 +19,14 @@ help:
 	@echo "  make format            - formata o backend (Ruff)"
 	@echo "  make run               - inicia a API em http://localhost:8000"
 	@echo "  make db-migration msg=\"...\" - gera migration autogenerate (Alembic)"
+	@echo "  make up-build          - constroi e inicia db, api e frontend (Docker Compose)"
+	@echo "  make up                - inicia os servicos sem reconstruir"
+	@echo "  make down              - para os servicos (mantem o volume do banco)"
+	@echo "  make ps                - estado e saude dos containers"
+	@echo "  make logs / logs-api   - acompanha os logs (todos / so a API)"
+	@echo "  make db-upgrade        - aplica migracoes pendentes no banco do Compose"
+	@echo "  make db-current        - revisao atual do Alembic no banco do Compose"
+	@echo "  make db-shell          - abre o psql no banco do Compose"
 	@echo "  make frontend-install  - instala dependencias do frontend (npm ci)"
 	@echo "  make frontend-dev      - inicia o frontend em http://localhost:5173"
 	@echo "  make frontend-lint     - Biome lint"
@@ -46,6 +55,36 @@ run:
 
 db-migration:
 	cd backend && poetry run alembic revision --autogenerate -m "$(msg)"
+
+# ---- Docker Compose (db + api + frontend) ----
+# Sem "down -v" de proposito: o volume do banco so e removido manualmente.
+
+up:
+	docker compose up -d
+
+up-build:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+ps:
+	docker compose ps
+
+logs:
+	docker compose logs -f
+
+logs-api:
+	docker compose logs -f api
+
+db-upgrade:
+	docker compose exec api alembic upgrade head
+
+db-current:
+	docker compose exec api alembic current
+
+db-shell:
+	docker compose exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 # ---- Frontend ----
 
