@@ -491,8 +491,7 @@ Nesse modo, as migrações não são aplicadas automaticamente. Rode
 
 ## Vídeo demonstrativo
 
-> ⚠️ **PENDENTE:** o link do vídeo demonstrativo (5 a 10 minutos, narrado)
-> será inserido aqui antes da entrega.
+https://youtu.be/ut0BaBfW2BY
 
 ---
 
